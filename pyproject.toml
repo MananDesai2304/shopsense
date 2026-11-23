@@ -10,3 +10,5 @@ dependencies = []
 members = [
     "apps/api",
 ]
+[tool.ruff]
+src = ["apps/api/src"]

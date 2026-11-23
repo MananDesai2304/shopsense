@@ -7,7 +7,9 @@ authors = [
     { name = "MananDesai", email = "manandesai575@gmail.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "fastapi>=0.165.0",
+]
 
 [project.scripts]
 api = "api:main"
@@ -15,3 +17,10 @@ api = "api:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
+]
