@@ -1,0 +1,19 @@
+version = 1
+revision = 2
+requires-python = ">=3.13"
+
+[manifest]
+members = [
+    "api",
+    "shopsense",
+]
+
+[[package]]
+name = "api"
+version = "0.1.0"
+source = { editable = "apps/api" }
+
+[[package]]
+name = "shopsense"
+version = "0.1.0"
+source = { virtual = "." }
