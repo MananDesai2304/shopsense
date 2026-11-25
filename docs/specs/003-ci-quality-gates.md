@@ -72,7 +72,8 @@ new spec.
 
 ### Job `gate-mix`
 
-- AC14: Gate paths are `CLAUDE.md`, anything under `.claude/` and anything
+- AC14: Gate paths are any `CLAUDE.md` at any depth (`**/CLAUDE.md`, so both
+  `CLAUDE.md` and `apps/api/CLAUDE.md`), anything under `.claude/` and anything
   under `.github/`.
 - AC15: Checks each non-merge commit in the PR separately, not the PR as a whole.
 - AC16: Fails if any single commit touches both a gate path and a non-gate
