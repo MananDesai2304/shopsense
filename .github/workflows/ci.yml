@@ -1,0 +1,127 @@
+# CI quality gates (spec 003). Job names are matched by branch protection:
+# do not rename quality, pr-size or gate-mix without a new spec.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # setup-uv publishes no floating major tag; its README pins this SHA.
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+
+      - name: Install dependencies (fails if uv.lock is stale)
+        run: uv sync --all-packages --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      # Migration tests need Docker for testcontainers. Fail loudly, never skip.
+      - name: Check Docker is available
+        run: docker info --format 'Docker server {{.ServerVersion}}'
+
+      - name: Test
+        run: uv run --package api pytest
+
+  pr-size:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check PR size (warn > 300 lines or 10 files, fail > 400 or 20)
+        run: |
+          mb=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
+          # One line per file: "<additions+deletions>\t<path>". Binary files count 0 lines.
+          per_file=$(git diff --numstat "$mb" "$HEAD_SHA" -- . \
+              ':(exclude,glob)**/uv.lock' ':(exclude,glob)**/pnpm-lock.yaml' \
+            | awk -F'\t' '{ a = ($1 == "-") ? 0 : $1; d = ($2 == "-") ? 0 : $2; print a + d "\t" $3 }')
+          files=$(printf '%s\n' "$per_file" | grep -c . || true)
+          lines=$(printf '%s\n' "$per_file" | awk -F'\t' '{ s += $1 } END { print s + 0 }')
+
+          echo "PR size: $lines lines changed in $files files (lockfiles excluded, merge base ${mb:0:12})"
+
+          if (( lines > 400 || files > 20 )); then
+            echo "Top 5 files by lines changed:"
+            printf '%s\n' "$per_file" | sort -t$'\t' -k1,1nr | head -5
+            echo "::error title=PR too large::$lines lines in $files files. Limit is 400 lines and 20 files (lockfiles excluded). Split the PR."
+            exit 1
+          elif (( lines > 300 || files > 10 )); then
+            echo "::warning title=PR is getting large::$lines lines in $files files. Aim for at most 300 lines and 10 files (lockfiles excluded)."
+          fi
+
+  gate-mix:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check no commit mixes gate and non-gate paths
+        run: |
+          # Gate paths: any CLAUDE.md at any depth, .claude/**, .github/**.
+          is_gate() {
+            case "$1" in
+              CLAUDE.md | */CLAUDE.md | .claude/* | .github/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          mb=$(git merge-base "origin/$BASE_REF" "$HEAD_SHA")
+          failed=0
+          checked=0
+          for sha in $(git rev-list --no-merges --reverse "$mb..$HEAD_SHA"); do
+            gate=()
+            other=()
+            # -z avoids path quoting; --no-renames lists both sides of a rename.
+            while IFS= read -r -d '' path; do
+              if is_gate "$path"; then gate+=("$path"); else other+=("$path"); fi
+            done < <(git diff-tree -z --no-commit-id --name-only -r --no-renames "$sha")
+            checked=$((checked + 1))
+
+            if (( ${#gate[@]} > 0 && ${#other[@]} > 0 )); then
+              failed=1
+              echo "::error title=Commit mixes gate and non-gate paths::Commit $sha changes both gate and non-gate files. Split it into separate commits."
+              echo "Commit $sha: $(git log -1 --format=%s "$sha")"
+              echo "  gate files:"
+              printf '    %s\n' "${gate[@]}"
+              echo "  non-gate files:"
+              printf '    %s\n' "${other[@]}"
+            fi
+          done
+
+          echo "Checked $checked non-merge commits since merge base ${mb:0:12}."
+          exit "$failed"
