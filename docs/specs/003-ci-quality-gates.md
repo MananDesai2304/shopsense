@@ -87,8 +87,10 @@ new spec.
   matcher `Edit|Write`.
 - AC19: The hook script (`.claude/hooks/format-python.sh`) reads the hook JSON
   from stdin, takes `tool_input.file_path`, and runs
-  `uv run ruff format <file>` only when the path ends in `.py`. It parses JSON
-  with `python3` (stdlib only), so it needs no extra tools.
+  `uv run ruff format <file>` only when the path ends in `.py` and its real
+  path (symlinks resolved) is inside `$CLAUDE_PROJECT_DIR`. Files outside the
+  project are left untouched and the hook exits 0. It parses JSON with
+  `python3` (stdlib only), so it needs no extra tools.
 - AC20: For non-Python files the hook does nothing and exits 0.
 - AC21: If ruff fails (for example on a syntax error), the hook exits 2 with
   the ruff error on stderr so Claude sees it and fixes the file.
