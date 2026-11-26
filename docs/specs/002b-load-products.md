@@ -63,9 +63,10 @@ What's in:
     and the value. Drop pairs with no colon or an empty key. Group values by key into a list in
     file order, with exact duplicates removed.
   - Upserts in batches inside one transaction (`INSERT ... ON CONFLICT (product_id) DO UPDATE`).
-  - Run with `uv run --package api python -m api.catalog.load_products`. It reads
-    `DATABASE_URL` from the environment and the file from `data/wands/product.csv` (resolved from
-    the repo root). The function underneath takes the path as an argument.
+  - Run with `uv run --package api python -m api.catalog.load_products [path]`. It reads
+    `DATABASE_URL` from the environment. The optional `path` argument names the input file;
+    without it the file is `data/wands/product.csv` (resolved from the repo root). The function
+    underneath takes the path as an argument.
   - Prints a progress line every 5,000 rows, then
     `loaded N products (inserted I, updated U) in S.Ss`. Exit 0. On error it writes to stderr
     and exits 1.
@@ -94,16 +95,16 @@ fixture, with migrations applied.
 | 4 | A quoted category like `"... Bar (28""-33"") Bar Stools"` loads unescaped as `... Bar (28"-33") Bar Stools`. | `test_quoted_category_is_unescaped` |
 | 5 | `category_path` is the hierarchy split on ` / ` with parts trimmed; NULL when the hierarchy is empty. | `test_category_path_split` |
 | 6 | `features_raw` equals the source field exactly. | `test_features_raw_preserved` |
-| 7 | Repeated keys collect all values in file order with exact duplicates removed: `mattresssize:queen\|mattresssize : twin` gives `{"mattresssize": ["queen", "twin"]}`. | `test_parse_features_groups_duplicate_keys` |
-| 8 | Pairs with an empty key, and fragments with no colon, are left out of `features`. | `test_parse_features_drops_empty_keys_and_fragments` |
-| 9 | A pair is split on the first colon only (`time:10:30` gives `{"time": ["10:30"]}`). | `test_parse_features_splits_on_first_colon` |
+| 7 | Repeated keys collect all values in file order with exact duplicates removed: `mattresssize:queen\|mattresssize : twin` gives `{"mattresssize": ["queen", "twin"]}`. | `test_parse_features[groups_duplicate_keys]` |
+| 8 | Pairs with an empty key, and fragments with no colon, are left out of `features`. | `test_parse_features[drops_empty_keys_and_fragments]` |
+| 9 | A pair is split on the first colon only (`time:10:30` gives `{"time": ["10:30"]}`). | `test_parse_features[splits_on_first_colon]` |
 | 10 | Loading the same file twice leaves the same row count and no duplicates; the second run reports 0 inserted. | `test_load_twice_is_idempotent` |
 | 11 | Reloading after a field changes in the file updates that row in place. | `test_reload_updates_changed_row` |
 | 12 | A malformed row (wrong column count, non-numeric or non-whole count, bad id) aborts the load: the error names the line number, and the table is unchanged from before the run. | `test_bad_row_aborts_without_writing` |
 | 13 | A header that is not exactly the 9 WANDS columns aborts before any write. | `test_wrong_header_aborts` |
 | 14 | A missing input file gives a clear stderr message and exit code 1. | `test_missing_file_exits_1` |
 | 15 | The CLI prints progress lines and the final `loaded N products (inserted I, updated U) in S.Ss` line, then exits 0. | `test_cli_prints_progress_and_summary` |
-| 16 | Loading the real `data/wands/product.csv` gives 42,994 rows; 9,452 have NULL `rating_count`; product 0's `features->'mattresssize'` is `["queen", "twin"]`. | `test_full_wands_load` (skipped when the file is absent, so tests pass without the data) |
+| 16 | Loading the real `data/wands/product.csv` gives 42,994 rows; 9,452 have NULL `rating_count`; product 0's `features->'mattresssize'` is `["queen", "twin"]`. The test carries a `wands` marker, registered in the root `pyproject.toml` and excluded by default (`addopts = -m "not wands"`), so CI never runs it. Run it with `uv run --package api pytest -m wands`; it fails, not skips, when the file is missing. | `test_full_wands_load` |
 | 17 | `uv run --package api pytest` and `uv run ruff check .` pass. | pre-PR check |
 
 ## Open risks
