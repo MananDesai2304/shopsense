@@ -12,3 +12,7 @@ members = [
 ]
 [tool.ruff]
 src = ["apps/api/src"]
+
+[tool.pytest.ini_options]
+addopts = '-m "not wands"'
+markers = ["wands: needs the real WANDS file at data/wands/product.csv (run with -m wands)"]
