@@ -35,6 +35,9 @@ HEADER = [
 ]
 
 
+INT4_MAX = 2**31 - 1  # product_id and the counts are Postgres int4 columns
+
+
 class LoadError(Exception):
     """The input file is malformed. The message starts with the line number."""
 
@@ -62,7 +65,7 @@ def _number(value: str, line: int, column: str, whole: bool) -> int | Decimal | 
         return None
     try:
         number = Decimal(value)
-        if whole and number == number.to_integral_value():
+        if whole and number == number.to_integral_value() and 0 <= number <= INT4_MAX:
             return int(number)
         if not whole and 0 <= number <= 5:
             return number
@@ -76,7 +79,7 @@ def parse_row(fields: list[str], line: int) -> dict:
     if len(fields) != len(HEADER):
         raise LoadError(f"line {line}: expected 9 columns, got {len(fields)}")
     pid, name, pclass, hierarchy, description, features, ratings, avg, reviews = fields
-    if not (pid.isascii() and pid.isdigit()) or not name:
+    if not (pid.isascii() and pid.isdigit() and int(pid) <= INT4_MAX) or not name:
         raise LoadError(f"line {line}: bad product_id or empty name: {pid!r}")
     path = [part.strip() for part in hierarchy.split(" / ")] if hierarchy else None
     return {

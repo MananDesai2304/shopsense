@@ -150,6 +150,8 @@ def test_reload_updates_changed_row(migrated_db: Engine, tmp_path: Path):  # 11
         pytest.param(_line("101", "many"), "rating_count", id="non_numeric_count"),
         pytest.param(_line("101", "2.5"), "rating_count", id="non_whole_count"),
         pytest.param(_line("x1"), "product_id", id="bad_id"),
+        pytest.param(_line("2147483648"), "product_id", id="id_out_of_range"),
+        pytest.param(_line("101", "-3.0"), "rating_count", id="negative_count"),
     ],
 )
 def test_bad_row_aborts_without_writing(  # 12
